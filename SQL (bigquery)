@@ -1,0 +1,62 @@
+WITH cohort_sizes AS
+(
+         SELECT   u.install_dt,
+                  u.experiment_group,
+                  Count(DISTINCT id) AS cohort_size
+         FROM     `ab_test.ab_test_analysis` u
+         WHERE    id IS NOT NULL
+         GROUP BY 1,
+                  2
+         ORDER BY 1,
+                  2 ), 
+
+active_days AS
+(
+         SELECT   a.*,
+                  date_diff(event_dt, install_dt,day) AS day_number
+         FROM     `ab_test.ab_test_analysis` a
+         WHERE    date_diff(event_dt, install_dt,day) < 8
+         ORDER BY 1,
+                  2,
+                  3,
+                  4 DESC ), 
+
+retention_prep AS
+(
+         SELECT   install_dt,
+                  event_dt,
+                  experiment_group,
+                  day_number,
+                  count(DISTINCT id) AS user_c,
+         FROM     active_days a
+         GROUP BY 1,
+                  2,
+                  3,
+                  4
+         ORDER BY 1,
+                  2,
+                  3,
+                  4 )
+--uncomment below to see average retention
+
+--, overall_retention as (
+SELECT    r.* ,
+          c.cohort_size,
+          r.user_c/c.cohort_size*100 AS retention,
+          CASE
+                    WHEN r.install_dt > '2022-10-12' THEN 'new_user'
+                    ELSE 'existing_user'
+          END AS user_status
+FROM      retention_prep r
+LEFT JOIN cohort_sizes c
+ON        r.install_dt = c.install_dt
+AND       r.experiment_group = c.experiment_group
+ORDER BY  install_dt,
+          day_number
+-- )
+
+--select day_number,
+--avg(retention) avg_retention
+--from overall_retention
+--group by 1
+--order by 1
